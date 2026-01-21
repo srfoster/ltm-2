@@ -1,4 +1,4 @@
-import { HelloWorld, ScratchEditor } from 'ltm-react'
+import { HelloWorld, ScratchEditor, VoxelEngine } from 'ltm-react'
 import { useState } from 'react'
 import './App.css'
 
@@ -8,6 +8,15 @@ function App() {
   const handleCodeChange = (code, language) => {
     setGeneratedCode(code);
     console.log(`Generated ${language} code:`, code);
+  };
+
+  const handleVoxelEngineReady = (engine) => {
+    console.log('Voxel engine ready:', engine);
+    // You can initialize your voxel world here
+  };
+
+  const handleVoxelError = (error) => {
+    console.error('Voxel engine error:', error);
   };
 
   // Define the Blockly toolbox configuration
@@ -119,6 +128,28 @@ function App() {
                 {generatedCode || '// Drag blocks to generate code...'}
               </pre>
             </div>
+          </div>
+        </div>
+
+        <div style={{ margin: '40px auto', maxWidth: '1200px' }}>
+          <h2>Divine Voxel Engine</h2>
+          <p>3D voxel-based world engine (Minecraft-like rendering)</p>
+          
+          <VoxelEngine 
+            width="100%"
+            height="600px"
+            onEngineReady={handleVoxelEngineReady}
+            onError={handleVoxelError}
+          />
+          
+          <div style={{ marginTop: '20px', padding: '15px', backgroundColor: '#f0f0f0', borderRadius: '8px' }}>
+            <h4 style={{ margin: '0 0 10px 0' }}>Note:</h4>
+            <p style={{ margin: 0, fontSize: '14px' }}>
+              To fully use the Voxel Engine, install: <code>npm install @divinevoxel/vlox @divinevoxel/vlox-babylon babylonjs</code>
+            </p>
+            <p style={{ margin: '10px 0 0 0', fontSize: '14px' }}>
+              See <code>ltm-react/VOXEL_GUIDE.md</code> for integration instructions.
+            </p>
           </div>
         </div>
       </main>

@@ -16,6 +16,10 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
+    "@babylonjs/core": "^8.46.2",
+    "@divinevoxel/vlox": "^0.0.80",
+    "@divinevoxel/vlox-babylon": "^0.0.59",
+    "babylonjs": "^8.46.2",
     "blockly": "^11.2.2",
     "react-blockly": "^8.1.2"
   },

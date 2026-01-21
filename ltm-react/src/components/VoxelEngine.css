@@ -1,0 +1,60 @@
+.voxel-engine-container {
+  position: relative;
+  user-select: none;
+}
+
+.voxel-engine-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  cursor: crosshair;
+}
+
+.voxel-engine-loading {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  color: #ffffff;
+  z-index: 10;
+}
+
+.loading-spinner {
+  width: 50px;
+  height: 50px;
+  border: 4px solid rgba(255, 255, 255, 0.1);
+  border-top-color: #ffffff;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin: 0 auto 20px;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.voxel-engine-error {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  color: #ff6b6b;
+  background-color: rgba(0, 0, 0, 0.8);
+  padding: 20px;
+  border-radius: 8px;
+  max-width: 80%;
+  z-index: 10;
+}
+
+.voxel-engine-error h3 {
+  margin: 0 0 10px 0;
+  color: #ff6b6b;
+}
+
+.voxel-engine-error p {
+  margin: 0;
+  font-size: 14px;
+  color: #ffffff;
+}
