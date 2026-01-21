@@ -1,0 +1,30 @@
+{
+  "name": "ltm-react",
+  "version": "0.1.0",
+  "description": "React component library for LTM projects",
+  "main": "src/index.js",
+  "type": "module",
+  "scripts": {
+    "dev": "echo 'This is a library. Run npm run dev in the frontend folder to test.'",
+    "build": "echo 'Build script coming soon'"
+  },
+  "keywords": [
+    "react",
+    "components",
+    "library"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "blockly": "^11.2.2",
+    "react-blockly": "^8.1.2"
+  },
+  "peerDependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  },
+  "devDependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  }
+}
