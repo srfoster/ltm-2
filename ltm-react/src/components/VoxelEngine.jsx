@@ -270,7 +270,8 @@ const VoxelEngine = forwardRef(({
         engineRef.current.babylonEngine.dispose();
       }
     };
-  }, [engineConfig, onEngineReady, onError, worldConfig, onVoxelChange]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Only run once on mount - worldConfig is captured in closure
 
   // Expose methods to parent via ref
   useImperativeHandle(ref, () => ({

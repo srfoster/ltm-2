@@ -1,5 +1,5 @@
 import { HelloWorld, ScratchEditor, VoxelEngine } from 'ltm-react'
-import { useState, useRef } from 'react'
+import { useState, useRef, useCallback } from 'react'
 import './App.css'
 
 function App() {
@@ -12,19 +12,19 @@ function App() {
     console.log(`Generated ${language} code:`, code);
   };
 
-  const handleVoxelEngineReady = (engine) => {
+  const handleVoxelEngineReady = useCallback((engine) => {
     console.log('Voxel engine ready:', engine);
     // You can initialize your voxel world here
-  };
+  }, []);
 
-  const handleVoxelError = (error) => {
+  const handleVoxelError = useCallback((error) => {
     console.error('Voxel engine error:', error);
-  };
+  }, []);
 
-  const handleVoxelChange = (changeData) => {
+  const handleVoxelChange = useCallback((changeData) => {
     console.log('Voxel world changed:', changeData);
     setVoxelWorld(changeData.voxels);
-  };
+  }, []);
 
   // Define a custom world configuration
   const worldConfig = {
