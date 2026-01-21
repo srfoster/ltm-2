@@ -1,13 +1,19 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { BlocklyWorkspace } from 'react-blockly';
 import * as Blockly from 'blockly';
 import 'blockly/blocks';
-import { javascriptGenerator } from 'blockly/javascript';
+import { javascriptGenerator, Order } from 'blockly/javascript';
 import { pythonGenerator } from 'blockly/python';
 import { phpGenerator } from 'blockly/php';
 import { luaGenerator } from 'blockly/lua';
 import { dartGenerator } from 'blockly/dart';
+import { defineVoxelBlocks, defineVoxelGenerators } from './VoxelBlocks';
 import './ScratchEditor.css';
+
+// Register blocks globally once at module load time
+defineVoxelBlocks(Blockly);
+defineVoxelGenerators(javascriptGenerator, Order);
+console.log('Voxel blocks registered at module load');
 
 /**
  * ScratchEditor - A wrapper component for Blockly providing drag and drop block-based coding
@@ -32,6 +38,56 @@ const ScratchEditor = ({
   ...props 
 }) => {
   const [workspace, setWorkspace] = useState(null);
+  const workspaceRef = useRef(null);
+
+  // onInject is called when workspace is created - register blocks here
+  const handleInject = (injectedWorkspace) => {
+    console.log('Workspace injected! Registering custom blocks...');
+    workspaceRef.current = injectedWorkspace;
+    
+    // The workspace was just created by react-blockly's bundled Blockly
+    // We need to register blocks on THAT Blockly instance, not our imported one
+    try {
+      // Access Blockly through the workspace object
+      // The workspace has references to Block constructors and other Blockly internals
+      const WorkspaceBlockly = injectedWorkspace.constructor;
+      
+      // Walk up the constructor chain to find the Blockly root object
+      let BlocklyRoot = WorkspaceBlockly;
+      while (BlocklyRoot && !BlocklyRoot.Blocks) {
+        BlocklyRoot = Object.getPrototypeOf(BlocklyRoot);
+      }
+      
+      // If we found Blocks, we have the right Blockly object
+      if (BlocklyRoot && BlocklyRoot.Blocks) {
+        console.log('Found react-blockly Blockly instance through workspace');
+        
+        // Check if blocks are already registered
+        if (!BlocklyRoot.Blocks['voxel_add']) {
+          console.log('Registering voxel blocks...');
+          defineVoxelBlocks({ Blocks: BlocklyRoot.Blocks });
+          
+          // Try to find JavaScript generator
+          if (BlocklyRoot.JavaScript) {
+            console.log('Found JavaScript generator');
+            defineVoxelGenerators(BlocklyRoot.JavaScript, BlocklyRoot.JavaScript.Order);
+          } else {
+            console.log('Using imported generator');
+            defineVoxelGenerators(javascriptGenerator, Order);
+          }
+          console.log('✓ Voxel blocks registered successfully on react-blockly Blockly');
+        } else {
+          console.log('Voxel blocks already registered');
+        }
+      } else {
+        console.log('Could not find Blockly.Blocks, using imported Blockly');
+        // Fallback to our imported Blockly (already registered at module load)
+      }
+    } catch (e) {
+      console.error('Failed to register blocks:', e);
+      console.log('Using fallback registration on imported Blockly');
+    }
+  };
 
   const handleWorkspaceChange = (workspace) => {
     setWorkspace(workspace);
@@ -101,6 +157,7 @@ const ScratchEditor = ({
           media: 'https://unpkg.com/blockly/media/',
         }}
         toolboxConfiguration={toolbox}
+        onInject={handleInject}
         onWorkspaceChange={handleWorkspaceChange}
         {...props}
       />
