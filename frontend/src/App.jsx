@@ -1,20 +1,13 @@
-import { HelloWorld, ScratchEditor, VoxelEngine } from 'ltm-react'
+import { HelloWorld, JigsawEditor, VoxelEngine } from 'ltm-react'
 import { useState, useRef, useCallback } from 'react'
 import './App.css'
 
 function App() {
-  const [generatedCode, setGeneratedCode] = useState('');
   const [voxelWorld, setVoxelWorld] = useState(null);
   const voxelEngineRef = useRef(null);
 
-  const handleCodeChange = (code, language) => {
-    setGeneratedCode(code);
-    console.log(`Generated ${language} code:`, code);
-  };
-
   const handleVoxelEngineReady = useCallback((engine) => {
     console.log('Voxel engine ready:', engine);
-    // You can initialize your voxel world here
   }, []);
 
   const handleVoxelError = useCallback((error) => {
@@ -92,66 +85,29 @@ function App() {
     });
   };
 
-  // Define the Blockly toolbox configuration
-  const toolbox = {
-    kind: 'categoryToolbox',
-    contents: [
-      {
-        kind: 'category',
-        name: 'Logic',
-        colour: '210',
-        contents: [
-          { kind: 'block', type: 'controls_if' },
-          { kind: 'block', type: 'logic_compare' },
-          { kind: 'block', type: 'logic_operation' },
-          { kind: 'block', type: 'logic_negate' },
-          { kind: 'block', type: 'logic_boolean' },
-        ],
-      },
-      {
-        kind: 'category',
-        name: 'Loops',
-        colour: '120',
-        contents: [
-          { kind: 'block', type: 'controls_repeat_ext' },
-          { kind: 'block', type: 'controls_whileUntil' },
-          { kind: 'block', type: 'controls_for' },
-        ],
-      },
-      {
-        kind: 'category',
-        name: 'Math',
-        colour: '230',
-        contents: [
-          { kind: 'block', type: 'math_number' },
-          { kind: 'block', type: 'math_arithmetic' },
-          { kind: 'block', type: 'math_single' },
-        ],
-      },
-      {
-        kind: 'category',
-        name: 'Text',
-        colour: '160',
-        contents: [
-          { kind: 'block', type: 'text' },
-          { kind: 'block', type: 'text_print' },
-          { kind: 'block', type: 'text_join' },
-        ],
-      },
-      {
-        kind: 'category',
-        name: 'Variables',
-        colour: '330',
-        custom: 'VARIABLE',
-      },
-      {
-        kind: 'category',
-        name: 'Functions',
-        colour: '290',
-        custom: 'PROCEDURE',
-      },
-    ],
-  };
+  // Define initial blocks for the JigsawEditor
+  const initialBlocks = [
+    { 
+      id: '1', 
+      type: 'add_voxel', 
+      x: 50, 
+      y: 50, 
+      width: 150, 
+      height: 60, 
+      label: 'Add Voxel',
+      color: '#4CAF50'
+    },
+    { 
+      id: '2', 
+      type: 'remove_voxel', 
+      x: 50, 
+      y: 130, 
+      width: 150, 
+      height: 60, 
+      label: 'Remove Voxel',
+      color: '#f44336'
+    },
+  ];
 
   return (
     <div className="App">
@@ -170,15 +126,31 @@ function App() {
         </div>
 
         <div style={{ margin: '40px auto', maxWidth: '1200px' }}>
-          <h2>Blockly Block-Based Programming Editor</h2>
-          <p>Drag and drop blocks to create code. Based on Scratch/Blockly.</p>
+          <h2>Jigsaw Block Editor for Voxel World</h2>
+          <p>
+            Drag blocks around the canvas to build your program!
+            <br />
+            • Pan: Click and drag the background
+            <br />
+            • Zoom: Use mouse wheel
+            <br />
+            • Move blocks: Click and drag them
+          </p>
           
           <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '20px' }}>
-            <ScratchEditor 
-              height="600px"
-              toolbox={toolbox}
-              onCodeChange={handleCodeChange}
-              codeLanguage="JavaScript"
+            <JigsawEditor 
+              width={800}
+              height={600}
+              blocks={initialBlocks}
+              onBlocksChange={(blocks) => console.log('Blocks changed:', blocks)}
+              onExecute={(block) => {
+                console.log('Execute block:', block);
+                if (block.type === 'add_voxel' && voxelEngineRef.current) {
+                  voxelEngineRef.current.addVoxel(0, 0, 0, '#4CAF50');
+                } else if (block.type === 'remove_voxel' && voxelEngineRef.current) {
+                  voxelEngineRef.current.removeVoxel(0, 0, 0);
+                }
+              }}
             />
             
             <div style={{ 
@@ -189,17 +161,18 @@ function App() {
               height: '600px',
               overflow: 'auto'
             }}>
-              <h3 style={{ marginTop: 0 }}>Generated Code:</h3>
-              <pre style={{ 
-                backgroundColor: '#282c34', 
-                color: '#abb2bf', 
-                padding: '15px', 
-                borderRadius: '4px',
-                fontSize: '14px',
-                overflow: 'auto'
-              }}>
-                {generatedCode || '// Drag blocks to generate code...'}
-              </pre>
+              <h3 style={{ marginTop: 0 }}>Block Palette</h3>
+              <div style={{ marginBottom: '15px', padding: '10px', backgroundColor: '#e3f2fd', borderRadius: '4px', fontSize: '14px' }}>
+                <strong>Instructions:</strong><br/>
+                • Drag blocks to arrange them<br/>
+                • Double-click a block to execute it<br/>
+                • Use pan and zoom to navigate
+              </div>
+              <div style={{ marginTop: '15px', padding: '10px', backgroundColor: '#fff3cd', borderRadius: '4px', fontSize: '12px' }}>
+                <strong>Available Actions:</strong><br/>
+                • <span style={{ color: '#4CAF50', fontWeight: 'bold' }}>Add Voxel</span> - Places a green voxel at (0,0,0)<br/>
+                • <span style={{ color: '#f44336', fontWeight: 'bold' }}>Remove Voxel</span> - Removes voxel at (0,0,0)
+              </div>
             </div>
           </div>
         </div>

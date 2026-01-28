@@ -1,0 +1,23 @@
+.jigsaw-editor {
+  touch-action: none;
+}
+
+.jigsaw-block {
+  will-change: transform;
+}
+
+.jigsaw-block-command {
+  background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
+}
+
+.jigsaw-block-command:hover {
+  background: linear-gradient(135deg, #45a049 0%, #3d8b40 100%);
+}
+
+.jigsaw-canvas {
+  pointer-events: none;
+}
+
+.jigsaw-block {
+  pointer-events: auto;
+}
