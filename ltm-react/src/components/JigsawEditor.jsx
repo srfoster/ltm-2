@@ -106,36 +106,51 @@ const JigsawEditor = ({
     const container = blocksList.find(b => b.id === containerId);
     if (!container || container.type !== 'container') return blocksList;
     
-    // Count children by following the childId -> nextId chain
+    // Count children and find widest child by following the childId -> nextId chain
     let childCount = 0;
+    let maxChildWidth = 0;
+    
     if (container.childId) {
       let currentId = container.childId;
       while (currentId) {
         childCount++;
         const child = blocksList.find(b => b.id === currentId);
-        if (child && child.nextId) {
-          currentId = child.nextId;
+        if (child) {
+          // Estimate child width based on text length (rough approximation)
+          // Each character is ~8px in monospace font, plus padding
+          const estimatedWidth = Math.max(200, (child.text.length * 8) + 40);
+          maxChildWidth = Math.max(maxChildWidth, estimatedWidth);
+          
+          if (child.nextId) {
+            currentId = child.nextId;
+          } else {
+            break;
+          }
         } else {
           break;
         }
       }
     }
     
-    console.log(`Container ${containerId} has ${childCount} children`);
+    console.log(`Container ${containerId} has ${childCount} children, widest: ${maxChildWidth}px`);
     
     // Calculate dimensions
     const minWidth = 250;
     const headerHeight = 40;
     const blockHeight = BLOCK_HEIGHT; // 50px
-    const padding = BLOCK_PADDING * 2; // top and bottom padding
+    const verticalPadding = BLOCK_PADDING * 2; // top and bottom padding
+    const leftIndent = BLOCK_PADDING; // 15px
+    const rightPadding = 25; // padding on right
     
     // Height = header + (number of blocks * block height) + padding
     // Minimum 1 block space even if empty
     const numBlockSpaces = Math.max(1, childCount);
-    const requiredHeight = headerHeight + (numBlockSpaces * blockHeight) + padding;
+    const requiredHeight = headerHeight + (numBlockSpaces * blockHeight) + verticalPadding;
     
-    // Width should fit the widest block (200px minWidth from CSS) + padding
-    const requiredWidth = Math.max(minWidth, 200 + BLOCK_PADDING * 2);
+    // Width = left indent + widest child + right padding
+    // Use minWidth if no children or calculated width is smaller
+    const calculatedWidth = leftIndent + maxChildWidth + rightPadding;
+    const requiredWidth = Math.max(minWidth, calculatedWidth);
     
     console.log(`Container size: w=${requiredWidth}, h=${requiredHeight} for ${childCount} blocks`);
     
@@ -484,22 +499,26 @@ const JigsawEditor = ({
                   backgroundColor: 'rgba(156, 39, 176, 0.1)',
                   border: '3px solid #9C27B0',
                   borderRadius: '12px',
-                  cursor: draggedBlock === block.id ? 'grabbing' : 'grab',
                   boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
                   transition: draggedBlock === block.id ? 'none' : 'all 0.2s',
+                  pointerEvents: 'none', // Let clicks pass through to children
                 }}
-                onMouseDown={(e) => handleBlockMouseDown(e, block)}
               >
-                <div style={{
-                  padding: '8px 15px',
-                  backgroundColor: '#9C27B0',
-                  color: 'white',
-                  borderRadius: '8px 8px 0 0',
-                  fontFamily: 'monospace',
-                  fontSize: '14px',
-                  fontWeight: 'bold',
-                  marginBottom: '10px'
-                }}>
+                <div 
+                  style={{
+                    padding: '8px 15px',
+                    backgroundColor: '#9C27B0',
+                    color: 'white',
+                    borderRadius: '8px 8px 0 0',
+                    fontFamily: 'monospace',
+                    fontSize: '14px',
+                    fontWeight: 'bold',
+                    marginBottom: '10px',
+                    cursor: draggedBlock === block.id ? 'grabbing' : 'grab',
+                    pointerEvents: 'auto', // Enable clicks on header to drag container
+                  }}
+                  onMouseDown={(e) => handleBlockMouseDown(e, block)}
+                >
                   {block.text} [{children.length} blocks, h={block.height}px]
                 </div>
                 <div style={{
