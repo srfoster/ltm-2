@@ -248,12 +248,17 @@ const JigsawEditor = ({
       // Get all blocks connected below this one
       const connectedIds = getConnectedBlocks(draggedBlock);
       
+      // If dragging a container, also include all its children
+      const childIds = draggedBlockData.type === 'container' 
+        ? getContainerChildren(draggedBlock)
+        : [];
+      
       // Find potential snap target
       let potentialSnapTarget = null;
       let snapType = null; // 'bottom' or 'top'
       
       for (const block of blocks) {
-        if (block.id === draggedBlock || connectedIds.includes(block.id)) continue;
+        if (block.id === draggedBlock || connectedIds.includes(block.id) || childIds.includes(block.id)) continue;
         
         const horizontalAlign = Math.abs(newX - block.x) < SNAP_THRESHOLD;
         
@@ -294,8 +299,8 @@ const JigsawEditor = ({
             x: newX,
             y: newY
           };
-        } else if (connectedIds.includes(block.id)) {
-          // Move connected blocks by the same delta
+        } else if (connectedIds.includes(block.id) || childIds.includes(block.id)) {
+          // Move connected blocks and container children by the same delta
           return {
             ...block,
             x: block.x + deltaX,
