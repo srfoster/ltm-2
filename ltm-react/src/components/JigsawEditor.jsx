@@ -21,7 +21,7 @@ const JigsawEditor = ({
     { id: 1, type: 'command', text: 'addVoxel(0, 1, 0, 1, 0, 0)', x: 50, y: 50, nextId: null },
     { id: 2, type: 'command', text: 'addVoxel(0, 2, 0, 0, 1, 0)', x: 50, y: 120, nextId: null },
     { id: 3, type: 'command', text: 'removeVoxel(0, 1, 0)', x: 50, y: 190, nextId: null },
-    { id: 4, type: 'container', text: 'function myFunction()', x: 300, y: 50, nextId: null, childId: null, width: 250, height: 40 + BLOCK_HEIGHT + BLOCK_PADDING * 2 }, // header + 1 block height + padding
+    { id: 4, type: 'container', text: 'function myFunction()', x: 300, y: 50, nextId: null, childId: null },
   ]);
   
   const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
@@ -32,6 +32,53 @@ const JigsawEditor = ({
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [snapTarget, setSnapTarget] = useState(null); // block to snap to
   const [snapType, setSnapType] = useState(null); // 'top' or 'bottom'
+
+  // Calculate container dimensions reactively based on children
+  const getContainerDimensions = (container) => {
+    // Count children by following the childId -> nextId chain
+    let childCount = 0;
+    let maxChildWidth = 0;
+    
+    if (container.childId) {
+      let currentId = container.childId;
+      while (currentId) {
+        childCount++;
+        const child = blocks.find(b => b.id === currentId);
+        if (child) {
+          // Estimate child width based on text length
+          const estimatedWidth = Math.max(200, (child.text.length * 8) + 40);
+          maxChildWidth = Math.max(maxChildWidth, estimatedWidth);
+          
+          if (child.nextId) {
+            currentId = child.nextId;
+          } else {
+            break;
+          }
+        } else {
+          break;
+        }
+      }
+    }
+    
+    // Calculate dimensions
+    const minWidth = 250;
+    const headerHeight = 40;
+    const blockHeight = BLOCK_HEIGHT; // 50px
+    const verticalPadding = BLOCK_PADDING * 2; // top and bottom padding
+    const leftIndent = BLOCK_PADDING; // 15px
+    const rightPadding = 25; // padding on right
+    
+    // Height = header + (number of blocks * block height) + padding
+    // Minimum 1 block space even if empty
+    const numBlockSpaces = Math.max(1, childCount);
+    const height = headerHeight + (numBlockSpaces * blockHeight) + verticalPadding;
+    
+    // Width = left indent + widest child + right padding
+    const calculatedWidth = leftIndent + maxChildWidth + rightPadding;
+    const width = Math.max(minWidth, calculatedWidth);
+    
+    return { width, height, childCount };
+  };
 
   // Generate code from blocks
   useEffect(() => {
@@ -83,12 +130,15 @@ const JigsawEditor = ({
 
   // Check if a block is inside a container
   const isBlockInsideContainer = (blockX, blockY, container) => {
+    // Get reactive dimensions
+    const { width, height } = getContainerDimensions(container);
+    
     // Check if the block overlaps with the container's interior area
     // Container interior starts after the header (40px) and has padding
     const containerLeft = container.x;
-    const containerRight = container.x + container.width;
+    const containerRight = container.x + width;
     const containerTop = container.y + 40; // after header
-    const containerBottom = container.y + container.height;
+    const containerBottom = container.y + height;
     
     // Block occupies space from (blockX, blockY) to (blockX + 200, blockY + 50)
     const blockRight = blockX + 200; // approximate block width
@@ -99,66 +149,6 @@ const JigsawEditor = ({
     const verticalOverlap = blockY < containerBottom && blockBottom > containerTop;
     
     return horizontalOverlap && verticalOverlap;
-  };
-
-  // Update container size to fit its children
-  const updateContainerSize = (containerId, blocksList) => {
-    const container = blocksList.find(b => b.id === containerId);
-    if (!container || container.type !== 'container') return blocksList;
-    
-    // Count children and find widest child by following the childId -> nextId chain
-    let childCount = 0;
-    let maxChildWidth = 0;
-    
-    if (container.childId) {
-      let currentId = container.childId;
-      while (currentId) {
-        childCount++;
-        const child = blocksList.find(b => b.id === currentId);
-        if (child) {
-          // Estimate child width based on text length (rough approximation)
-          // Each character is ~8px in monospace font, plus padding
-          const estimatedWidth = Math.max(200, (child.text.length * 8) + 40);
-          maxChildWidth = Math.max(maxChildWidth, estimatedWidth);
-          
-          if (child.nextId) {
-            currentId = child.nextId;
-          } else {
-            break;
-          }
-        } else {
-          break;
-        }
-      }
-    }
-    
-    console.log(`Container ${containerId} has ${childCount} children, widest: ${maxChildWidth}px`);
-    
-    // Calculate dimensions
-    const minWidth = 250;
-    const headerHeight = 40;
-    const blockHeight = BLOCK_HEIGHT; // 50px
-    const verticalPadding = BLOCK_PADDING * 2; // top and bottom padding
-    const leftIndent = BLOCK_PADDING; // 15px
-    const rightPadding = 25; // padding on right
-    
-    // Height = header + (number of blocks * block height) + padding
-    // Minimum 1 block space even if empty
-    const numBlockSpaces = Math.max(1, childCount);
-    const requiredHeight = headerHeight + (numBlockSpaces * blockHeight) + verticalPadding;
-    
-    // Width = left indent + widest child + right padding
-    // Use minWidth if no children or calculated width is smaller
-    const calculatedWidth = leftIndent + maxChildWidth + rightPadding;
-    const requiredWidth = Math.max(minWidth, calculatedWidth);
-    
-    console.log(`Container size: w=${requiredWidth}, h=${requiredHeight} for ${childCount} blocks`);
-    
-    return blocksList.map(b => 
-      b.id === containerId 
-        ? { ...b, width: requiredWidth, height: requiredHeight }
-        : b
-    );
   };
 
   // Handle mouse down on canvas (start panning)
@@ -176,12 +166,58 @@ const JigsawEditor = ({
     
     // Break connection to parent when starting to drag
     setBlocks(prevBlocks => {
-      return prevBlocks.map(b => {
+      let updated = prevBlocks.map(b => {
         if (b.nextId === block.id) {
           return { ...b, nextId: null };
         }
         return b;
       });
+      
+      // Check if this block was a child of a container and remove it
+      const containerWithChild = updated.find(b => b.type === 'container' && b.childId === block.id);
+      if (containerWithChild) {
+        console.log('Removing block from container as first child:', block.id);
+        const draggedBlock = updated.find(b => b.id === block.id);
+        // Block was the first child, update container's childId to next block (or null if no next)
+        updated = updated.map(b => {
+          if (b.id === containerWithChild.id) {
+            return { ...b, childId: draggedBlock?.nextId || null };
+          }
+          // Clear the dragged block's nextId since it's being removed
+          if (b.id === block.id) {
+            return { ...b, nextId: null };
+          }
+          return b;
+        });
+        console.log('Container after removal:', updated.find(b => b.id === containerWithChild.id));
+      } else {
+        // Check if any container has this block in its chain
+        const containers = updated.filter(b => b.type === 'container');
+        for (const container of containers) {
+          if (container.childId) {
+            // Check if this block is in the container's chain
+            let currentId = container.childId;
+            let inThisContainer = false;
+            while (currentId) {
+              if (currentId === block.id) {
+                inThisContainer = true;
+                break;
+              }
+              const child = updated.find(b => b.id === currentId);
+              if (child && child.nextId) {
+                currentId = child.nextId;
+              } else {
+                break;
+              }
+            }
+            if (inThisContainer) {
+              break;
+            }
+          }
+        }
+      }
+      
+      return updated;
     });
     
     // Calculate offset from mouse position to block position in canvas coordinates
@@ -362,14 +398,7 @@ const JigsawEditor = ({
             return b;
           });
           
-          console.log('Before updateContainerSize, updated blocks:', updated.find(b => b.id === droppedInContainer));
-          
-          // Update container size
-          const result = updateContainerSize(droppedInContainer, updated);
-          
-          console.log('After updateContainerSize:', result.find(b => b.id === droppedInContainer));
-          
-          return result;
+          return updated;
         });
       } else if (snapTarget !== null && snapType !== null) {
         // Normal block snapping
@@ -468,23 +497,8 @@ const JigsawEditor = ({
       >
         {blocks.map(block => {
           if (block.type === 'container') {
-            // Render container blocks differently
-            console.log(`Rendering container ${block.id} with height: ${block.height}`);
-            
-            // Count children for debugging
-            const children = [];
-            if (block.childId) {
-              let currentId = block.childId;
-              while (currentId) {
-                children.push(currentId);
-                const childBlock = blocks.find(b => b.id === currentId);
-                if (childBlock && childBlock.nextId) {
-                  currentId = childBlock.nextId;
-                } else {
-                  break;
-                }
-              }
-            }
+            // Calculate dimensions reactively
+            const { width, height, childCount } = getContainerDimensions(block);
             
             return (
               <div
@@ -494,8 +508,8 @@ const JigsawEditor = ({
                   position: 'absolute',
                   left: `${block.x}px`,
                   top: `${block.y}px`,
-                  width: `${block.width}px`,
-                  height: `${block.height}px`,
+                  width: `${width}px`,
+                  height: `${height}px`,
                   backgroundColor: 'rgba(156, 39, 176, 0.1)',
                   border: '3px solid #9C27B0',
                   borderRadius: '12px',
@@ -519,7 +533,7 @@ const JigsawEditor = ({
                   }}
                   onMouseDown={(e) => handleBlockMouseDown(e, block)}
                 >
-                  {block.text} [{children.length} blocks, h={block.height}px]
+                  {block.text} [{childCount} blocks]
                 </div>
                 <div style={{
                   padding: `${BLOCK_PADDING}px`,
