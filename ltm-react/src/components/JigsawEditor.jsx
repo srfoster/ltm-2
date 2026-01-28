@@ -80,6 +80,23 @@ const JigsawEditor = ({
     return { width, height, childCount };
   };
 
+  // Parse block text into parts for rendering (e.g., "addVoxel(0,1,0)" -> ["addVoxel", "0", "1", "0"])
+  const parseBlockText = (text) => {
+    // Match function name and parameters
+    const match = text.match(/^(\w+)\((.*)\)$/);
+    if (!match) {
+      return [{ type: 'text', value: text }];
+    }
+    
+    const [, functionName, paramsStr] = match;
+    const params = paramsStr.split(',').map(p => p.trim()).filter(p => p);
+    
+    return [
+      { type: 'function', value: functionName },
+      ...params.map(p => ({ type: 'param', value: p }))
+    ];
+  };
+
   // Generate code from blocks
   useEffect(() => {
     if (onCodeChange) {
@@ -585,7 +602,37 @@ const JigsawEditor = ({
                   }
                 }}
               >
-                {block.text}
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center' }}>
+                  {parseBlockText(block.text).map((part, idx) => (
+                    <span
+                      key={idx}
+                      style={{
+                        display: 'inline-block',
+                        padding: part.type === 'function' ? '4px 8px' : '3px 7px',
+                        backgroundColor: part.type === 'function' 
+                          ? 'rgba(255, 255, 255, 0.25)' 
+                          : 'rgba(255, 255, 255, 0.35)',
+                        borderRadius: '4px',
+                        fontSize: part.type === 'function' ? '14px' : '13px',
+                        fontWeight: part.type === 'function' ? 'bold' : 'normal',
+                        cursor: 'pointer',
+                        transition: 'background-color 0.15s',
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = part.type === 'function'
+                          ? 'rgba(255, 255, 255, 0.35)'
+                          : 'rgba(255, 255, 255, 0.45)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = part.type === 'function'
+                          ? 'rgba(255, 255, 255, 0.25)'
+                          : 'rgba(255, 255, 255, 0.35)';
+                      }}
+                    >
+                      {part.value}
+                    </span>
+                  ))}
+                </div>
               </div>
             );
           }
