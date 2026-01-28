@@ -117,26 +117,7 @@ function App() {
       </header>
       
       <main>
-        <div style={{ margin: '40px auto', maxWidth: '600px' }}>
-          <HelloWorld />
-          
-          <div style={{ marginTop: '30px' }}>
-            <HelloWorld name="LTM Users" />
-          </div>
-        </div>
-
         <div style={{ margin: '40px auto', maxWidth: '1200px' }}>
-          <h2>Jigsaw Block Editor for Voxel World</h2>
-          <p>
-            Drag blocks around the canvas to build your program!
-            <br />
-            • Pan: Click and drag the background
-            <br />
-            • Zoom: Use mouse wheel
-            <br />
-            • Move blocks: Click and drag them
-          </p>
-          
           <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '20px' }}>
             <JigsawEditor 
               width={800}
