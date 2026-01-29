@@ -6,11 +6,204 @@ import {
   isBlockInsideContainer 
 } from './utils';
 
+/**
+ * Break connections when a stackable block starts being dragged
+ */
+const breakBlockConnections = (block, blocks) => {
+  let updated = blocks.map(b => {
+    if (b.nextId === block.id) {
+      return { ...b, nextId: null };
+    }
+    return b;
+  });
+  
+  // Check if this block was a child of a container block and remove it
+  const containerBlock = updated.find(b => b.type === 'container' && b.childId === block.id);
+  if (containerBlock) {
+    const draggedBlock = updated.find(b => b.id === block.id);
+    updated = updated.map(b => {
+      if (b.id === containerBlock.id) {
+        return { ...b, childId: draggedBlock?.nextId || null };
+      }
+      if (b.id === block.id) {
+        return { ...b, nextId: null };
+      }
+      return b;
+    });
+  }
+  
+  return updated;
+};
+
+/**
+ * Find potential snap target for the dragged stackable block
+ */
+const findSnapTarget = (draggedBlockId, newX, newY, blocks, connectedIds, childIds) => {
+  let potentialSnapTarget = null;
+  let snapType = null;
+  
+  for (const block of blocks) {
+    if (block.id === draggedBlockId || connectedIds.includes(block.id) || childIds.includes(block.id)) {
+      continue;
+    }
+    
+    const horizontalAlign = Math.abs(newX - block.x) < SNAP_THRESHOLD;
+    
+    // Check if dragged stackable block's bottom is near another stackable block's top
+    const draggedBottom = newY + BLOCK_HEIGHT;
+    const targetTop = block.y;
+    const verticalNearBottom = Math.abs(draggedBottom - targetTop) < SNAP_THRESHOLD;
+    
+    if (horizontalAlign && verticalNearBottom) {
+      potentialSnapTarget = block.id;
+      snapType = 'bottom';
+      break;
+    }
+    
+    // Check if dragged stackable block's top is near another stackable block's bottom
+    const draggedTop = newY;
+    const targetBottom = block.y + BLOCK_HEIGHT;
+    const verticalNearTop = Math.abs(draggedTop - targetBottom) < SNAP_THRESHOLD;
+    
+    if (horizontalAlign && verticalNearTop) {
+      if (!block.nextId) {
+        potentialSnapTarget = block.id;
+        snapType = 'top';
+        break;
+      }
+    }
+  }
+  
+  return { potentialSnapTarget, snapType };
+};
+
+/**
+ * Update positions of dragged block and all connected stackable blocks
+ */
+const updateBlockPositions = (draggedBlockId, newX, newY, deltaX, deltaY, connectedIds, childIds, blocks) => {
+  return blocks.map(block => {
+    if (block.id === draggedBlockId) {
+      return { ...block, x: newX, y: newY };
+    } else if (connectedIds.includes(block.id) || childIds.includes(block.id)) {
+      return {
+        ...block,
+        x: block.x + deltaX,
+        y: block.y + deltaY
+      };
+    }
+    return block;
+  });
+};
+
+/**
+ * Handle dropping a stackable block into a container block
+ */
+const handleDropInContainerBlock = (draggedBlockId, containerId, blocks) => {
+  let updated = blocks.map(b => {
+    if (b.nextId === draggedBlockId) {
+      return { ...b, nextId: null };
+    }
+    return b;
+  });
+  
+  const containerBlock = updated.find(b => b.id === containerId);
+  let blockIndex = 0;
+  let isFirstChild = !containerBlock.childId;
+  
+  if (isFirstChild) {
+    updated = updated.map(b => 
+      b.id === containerId 
+        ? { ...b, childId: draggedBlockId }
+        : b
+    );
+    blockIndex = 0;
+  } else {
+    let lastChildId = containerBlock.childId;
+    let lastChild = updated.find(b => b.id === lastChildId);
+    blockIndex = 1;
+    while (lastChild && lastChild.nextId) {
+      lastChildId = lastChild.nextId;
+      lastChild = updated.find(b => b.id === lastChildId);
+      blockIndex++;
+    }
+    updated = updated.map(b => 
+      b.id === lastChildId ? { ...b, nextId: draggedBlockId } : b
+    );
+  }
+  
+  const updatedContainer = updated.find(b => b.id === containerId);
+  const headerHeight = 40;
+  const newX = updatedContainer.x + BLOCK_PADDING;
+  const newY = updatedContainer.y + headerHeight + BLOCK_PADDING + (blockIndex * BLOCK_HEIGHT);
+  
+  updated = updated.map(b => {
+    if (b.id === draggedBlockId) {
+      return { ...b, x: newX, y: newY, nextId: null };
+    }
+    return b;
+  });
+  
+  return updated;
+};
+
+/**
+ * Handle dropping a stackable block beneath another stackable block
+ */
+const handleDropBeneathStackableBlock = (draggedBlockId, draggedBlockData, snapTarget, snapType, blocks) => {
+  const targetBlockData = blocks.find(b => b.id === snapTarget);
+  
+  if (!draggedBlockData || !targetBlockData) {
+    return blocks;
+  }
+  
+  const updatedBlocks = blocks.map(b => {
+    if (b.nextId === draggedBlockId) {
+      return { ...b, nextId: null };
+    }
+    return b;
+  });
+  
+  if (snapType === 'bottom') {
+    // Dragged stackable block snaps above the target stackable block
+    return updatedBlocks.map(block => {
+      if (block.id === draggedBlockId) {
+        return {
+          ...block,
+          x: targetBlockData.x,
+          y: targetBlockData.y - BLOCK_HEIGHT,
+          nextId: snapTarget
+        };
+      }
+      return block;
+    });
+  } else if (snapType === 'top') {
+    // Dragged stackable block snaps below the target stackable block
+    return updatedBlocks.map(block => {
+      if (block.id === draggedBlockId) {
+        return {
+          ...block,
+          x: targetBlockData.x,
+          y: targetBlockData.y + BLOCK_HEIGHT,
+          nextId: null
+        };
+      } else if (block.id === snapTarget) {
+        return {
+          ...block,
+          nextId: draggedBlockId
+        };
+      }
+      return block;
+    });
+  }
+  
+  return blocks;
+};
+
 export const useJigsawState = (onCodeChange) => {
   const [blocks, setBlocks] = useState([
-    { id: 1, type: 'command', text: 'addVoxel(0, 1, 0, 1, 0, 0)', x: 50, y: 50, nextId: null },
-    { id: 2, type: 'command', text: 'addVoxel(0, 2, 0, 0, 1, 0)', x: 50, y: 120, nextId: null },
-    { id: 3, type: 'command', text: 'removeVoxel(0, 1, 0)', x: 50, y: 190, nextId: null },
+    { id: 1, type: 'stackable', text: 'addVoxel(0, 1, 0, 1, 0, 0)', x: 50, y: 50, nextId: null },
+    { id: 2, type: 'stackable', text: 'addVoxel(0, 2, 0, 0, 1, 0)', x: 50, y: 120, nextId: null },
+    { id: 3, type: 'stackable', text: 'removeVoxel(0, 1, 0)', x: 50, y: 190, nextId: null },
     { id: 4, type: 'container', text: 'function myFunction()', x: 300, y: 50, nextId: null, childId: null },
   ]);
   
@@ -46,31 +239,7 @@ export const useJigsawState = (onCodeChange) => {
     setDraggedBlock(block.id);
     
     // Break connection to parent when starting to drag
-    setBlocks(prevBlocks => {
-      let updated = prevBlocks.map(b => {
-        if (b.nextId === block.id) {
-          return { ...b, nextId: null };
-        }
-        return b;
-      });
-      
-      // Check if this block was a child of a container and remove it
-      const containerWithChild = updated.find(b => b.type === 'container' && b.childId === block.id);
-      if (containerWithChild) {
-        const draggedBlock = updated.find(b => b.id === block.id);
-        updated = updated.map(b => {
-          if (b.id === containerWithChild.id) {
-            return { ...b, childId: draggedBlock?.nextId || null };
-          }
-          if (b.id === block.id) {
-            return { ...b, nextId: null };
-          }
-          return b;
-        });
-      }
-      
-      return updated;
-    });
+    setBlocks(prevBlocks => breakBlockConnections(block, prevBlocks));
     
     setDragOffset({
       x: e.clientX - panOffset.x - block.x,
@@ -95,73 +264,35 @@ export const useJigsawState = (onCodeChange) => {
       const deltaX = newX - draggedBlockData.x;
       const deltaY = newY - draggedBlockData.y;
       
-      // Get all blocks connected below this one
+      // Get all stackable blocks connected below this one
       const connectedIds = getConnectedBlocks(draggedBlock, blocks);
       
-      // If dragging a container, also include all its children
+      // If dragging a container block, also include all its children
       const childIds = draggedBlockData.type === 'container' 
         ? getContainerChildren(draggedBlock, blocks)
         : [];
       
       // Find potential snap target
-      let potentialSnapTarget = null;
-      let snapType = null;
-      
-      for (const block of blocks) {
-        if (block.id === draggedBlock || connectedIds.includes(block.id) || childIds.includes(block.id)) continue;
-        
-        const horizontalAlign = Math.abs(newX - block.x) < SNAP_THRESHOLD;
-        
-        // Check if dragged block's bottom is near another block's top
-        const draggedBottom = newY + BLOCK_HEIGHT;
-        const targetTop = block.y;
-        const verticalNearBottom = Math.abs(draggedBottom - targetTop) < SNAP_THRESHOLD;
-        
-        if (horizontalAlign && verticalNearBottom) {
-          potentialSnapTarget = block.id;
-          snapType = 'bottom';
-          break;
-        }
-        
-        // Check if dragged block's top is near another block's bottom
-        const draggedTop = newY;
-        const targetBottom = block.y + BLOCK_HEIGHT;
-        const verticalNearTop = Math.abs(draggedTop - targetBottom) < SNAP_THRESHOLD;
-        
-        if (horizontalAlign && verticalNearTop) {
-          if (!block.nextId) {
-            potentialSnapTarget = block.id;
-            snapType = 'top';
-            break;
-          }
-        }
-      }
+      const { potentialSnapTarget, snapType: newSnapType } = findSnapTarget(
+        draggedBlock, newX, newY, blocks, connectedIds, childIds
+      );
       
       setSnapTarget(potentialSnapTarget);
-      setSnapType(snapType);
+      setSnapType(newSnapType);
       
-      // Update positions of dragged block and all connected blocks
-      setBlocks(blocks.map(block => {
-        if (block.id === draggedBlock) {
-          return { ...block, x: newX, y: newY };
-        } else if (connectedIds.includes(block.id) || childIds.includes(block.id)) {
-          return {
-            ...block,
-            x: block.x + deltaX,
-            y: block.y + deltaY
-          };
-        }
-        return block;
-      }));
+      // Update positions of dragged block and all connected stackable blocks
+      setBlocks(updateBlockPositions(
+        draggedBlock, newX, newY, deltaX, deltaY, connectedIds, childIds, blocks
+      ));
     }
   };
 
-  // Handle mouse up - apply snapping
+  // Handle mouse up - apply snapping or container drop
   const handleMouseUp = () => {
     if (draggedBlock !== null) {
       const draggedBlockData = blocks.find(b => b.id === draggedBlock);
       
-      // Check if block was dropped into a container
+      // Check if stackable block was dropped into a container block
       let droppedInContainer = null;
       for (const block of blocks) {
         if (block.type === 'container' && block.id !== draggedBlock && draggedBlockData) {
@@ -173,100 +304,13 @@ export const useJigsawState = (onCodeChange) => {
       }
       
       if (droppedInContainer) {
-        // Add block to container
-        setBlocks(prevBlocks => {
-          let updated = prevBlocks.map(b => {
-            if (b.nextId === draggedBlock) {
-              return { ...b, nextId: null };
-            }
-            return b;
-          });
-          
-          const container = updated.find(b => b.id === droppedInContainer);
-          let blockIndex = 0;
-          let isFirstChild = !container.childId;
-          
-          if (isFirstChild) {
-            updated = updated.map(b => 
-              b.id === droppedInContainer 
-                ? { ...b, childId: draggedBlock }
-                : b
-            );
-            blockIndex = 0;
-          } else {
-            let lastChildId = container.childId;
-            let lastChild = updated.find(b => b.id === lastChildId);
-            blockIndex = 1;
-            while (lastChild && lastChild.nextId) {
-              lastChildId = lastChild.nextId;
-              lastChild = updated.find(b => b.id === lastChildId);
-              blockIndex++;
-            }
-            updated = updated.map(b => 
-              b.id === lastChildId ? { ...b, nextId: draggedBlock } : b
-            );
-          }
-          
-          const updatedContainer = updated.find(b => b.id === droppedInContainer);
-          const headerHeight = 40;
-          const newX = updatedContainer.x + BLOCK_PADDING;
-          const newY = updatedContainer.y + headerHeight + BLOCK_PADDING + (blockIndex * BLOCK_HEIGHT);
-          
-          updated = updated.map(b => {
-            if (b.id === draggedBlock) {
-              return { ...b, x: newX, y: newY, nextId: null };
-            }
-            return b;
-          });
-          
-          return updated;
-        });
+        setBlocks(prevBlocks => 
+          handleDropInContainerBlock(draggedBlock, droppedInContainer, prevBlocks)
+        );
       } else if (snapTarget !== null && snapType !== null) {
-        // Normal block snapping
-        setBlocks(prevBlocks => {
-          const targetBlockData = prevBlocks.find(b => b.id === snapTarget);
-          
-          if (draggedBlockData && targetBlockData) {
-            const updatedBlocks = prevBlocks.map(b => {
-              if (b.nextId === draggedBlock) {
-                return { ...b, nextId: null };
-              }
-              return b;
-            });
-            
-            if (snapType === 'bottom') {
-              return updatedBlocks.map(block => {
-                if (block.id === draggedBlock) {
-                  return {
-                    ...block,
-                    x: targetBlockData.x,
-                    y: targetBlockData.y - BLOCK_HEIGHT,
-                    nextId: snapTarget
-                  };
-                }
-                return block;
-              });
-            } else if (snapType === 'top') {
-              return updatedBlocks.map(block => {
-                if (block.id === draggedBlock) {
-                  return {
-                    ...block,
-                    x: targetBlockData.x,
-                    y: targetBlockData.y + BLOCK_HEIGHT,
-                    nextId: null
-                  };
-                } else if (block.id === snapTarget) {
-                  return {
-                    ...block,
-                    nextId: draggedBlock
-                  };
-                }
-                return block;
-              });
-            }
-          }
-          return prevBlocks;
-        });
+        setBlocks(prevBlocks => 
+          handleDropBeneathStackableBlock(draggedBlock, draggedBlockData, snapTarget, snapType, prevBlocks)
+        );
       }
     }
     
